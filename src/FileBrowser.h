@@ -1,0 +1,62 @@
+/*
+** File:        FileBrowser.h
+** Description: FileBrowser gadget class: a listbrowser.gadget subclass that
+**              adds an icon (cell) view mode. In the default details mode it
+**              is the listbrowser, unchanged.
+**
+** OpenAmiga.org
+** This file is part of the OpenAmiga "Listbrowser gadget with cell mode"
+** project.
+**
+** For more information look at:
+** http://openamiga.org/?function=viewproject&projectid=52
+**
+** Change history:
+**  2026-11-14 orgin, created
+*/
+
+#ifndef FILEBROWSER_H
+#define FILEBROWSER_H
+
+#include <intuition/classes.h>
+
+#define FILEBROWSER_Dummy        (TAG_USER + 0x46420000) /* 'FB' */
+
+/* (uint32, ISG) FBVM_DETAILS (default, plain listbrowser) or FBVM_ICONS */
+#define FILEBROWSER_ViewMode     (FILEBROWSER_Dummy + 1)
+
+/* (uint32, ISG) Cell width in characters of the font in icon mode (default 14).
+   Longer texts are cropped as "Long str..." */
+#define FILEBROWSER_CellChars    (FILEBROWSER_Dummy + 2)
+
+/* (uint32, ISG) Bit mask of list columns that are not shown in icon mode
+   (bit n = column n). Default 0: every column is shown. */
+#define FILEBROWSER_HiddenColumns (FILEBROWSER_Dummy + 3)
+
+/* (int32, ISG) Pen used to fill the background in icon mode. Default -1: the
+   background pen of the first node (custom pens) or BACKGROUNDPEN. */
+#define FILEBROWSER_BackgroundPen (FILEBROWSER_Dummy + 4)
+
+/* (struct Hook *, ISG) Icon mode: hook returning a full size icon for a node,
+   drawn at its original size instead of the node's LBNCA_Image. Called as
+   CallHookPkt(hook, gadget, node) and must return a struct DiskObject * that
+   stays valid (owned by the application) or NULL to use the node's image.
+   It may be called from input.device: no DOS I/O in the hook. */
+#define FILEBROWSER_IconHook     (FILEBROWSER_Dummy + 5)
+
+enum
+{
+ FBVM_DETAILS = 0,
+ FBVM_ICONS   = 1
+};
+
+/*
+** Create/free the class. It is private: create objects with
+** NewObject(cl, NULL, ...) using the class pointer that
+** MakeFileBrowserClass() returns. Every LISTBROWSER_* attribute works as
+** with listbrowser.gadget.
+*/
+struct IClass *MakeFileBrowserClass(void);
+void FreeFileBrowserClass(struct IClass *cl);
+
+#endif /* FILEBROWSER_H */

@@ -1,0 +1,164 @@
+FileBrowser gadget class
+========================
+
+OpenAmiga project 52, "Listbrowser gadget with cell mode"
+http://openamiga.org/?function=viewproject&projectid=52
+
+
+Introduction
+------------
+
+FileBrowser is a subclass of listbrowser.gadget that adds an icon (cell) view
+mode. It is linked into the application (FileBrowser.c and FileBrowser.h);
+it is not a separate gadget library.
+
+In the default details mode (FBVM_DETAILS) every method goes to
+listbrowser.gadget, so the gadget looks and behaves exactly like a ListBrowser.
+An application can replace its ListBrowser with a FileBrowser and nothing
+changes for the user.
+
+In icon mode (FBVM_ICONS) the same list is shown as cells:
+
+ - Each list node is one cell: its image (or a full size icon from the
+   application) on top, then one line per list column below it.
+ - All cells have the same width. They are laid out like text, left to right
+   and top to bottom, using as many cell columns as fit the gadget width. The
+   view never scrolls horizontally.
+ - A vertical scroll bar on the right scrolls the view when the cells don't
+   fit. Resizing the gadget recalculates the layout.
+ - Texts longer than the cell are cropped as "Long str...".
+
+Switching between the modes is a single attribute:
+
+    SetGadgetAttrs(gadget, window, NULL, FILEBROWSER_ViewMode, FBVM_ICONS, TAG_DONE);
+
+The attached list, column info and the application's event handling stay as
+they are.
+
+
+Using the class
+---------------
+
+FileBrowser uses the application's global interface pointers. IExec,
+IIntuition, IGraphics, ILayers, IUtility, IIcon and IListBrowser must be open
+before the class is created.
+
+    #include "FileBrowser.h"
+
+    struct IClass *cl = MakeFileBrowserClass();
+
+    Object *gad = NewObject(cl, NULL,
+        GA_ID,                  GID_FILES,
+        GA_RelVerify,           TRUE,
+        LISTBROWSER_Labels,     &list,
+        LISTBROWSER_ColumnInfo, columninfo,
+        LISTBROWSER_ColumnTitles, TRUE,
+        LISTBROWSER_MultiSelect, TRUE,
+        FILEBROWSER_ViewMode,   FBVM_DETAILS,
+        TAG_DONE);
+
+    ...
+
+    DisposeObject(window_object);   /* disposes the gadget */
+    FreeFileBrowserClass(cl);
+
+The class is private: create objects with the class pointer, not by name.
+Free it only after every object made from it has been disposed.
+
+src/FileBrowserDemo.c is a complete example that lists a drawer and toggles
+between the two modes. Build it with "make" in src/.
+
+
+Functions
+---------
+
+struct IClass *MakeFileBrowserClass(void)
+
+    Creates the class. Returns NULL on failure.
+
+void FreeFileBrowserClass(struct IClass *cl)
+
+    Frees the class. NULL is allowed.
+
+
+Attributes
+----------
+
+All LISTBROWSER_* attributes work as with listbrowser.gadget. The class adds
+these (I = init, S = set, G = get):
+
+FILEBROWSER_ViewMode (uint32) - ISG
+
+    FBVM_DETAILS (default): the plain listbrowser view.
+    FBVM_ICONS: the icon (cell) view.
+
+FILEBROWSER_CellChars (uint32) - ISG
+
+    Width of a cell in characters of the gadget's font. Default 14. The cell
+    also grows to fit the widest image or icon.
+
+FILEBROWSER_HiddenColumns (uint32) - ISG
+
+    Bit mask of list columns that are not shown in the cells (bit n = column
+    n). Defined for the whole gadget, not per cell. Default 0: every column
+    is shown. Columns without text (LBNCA_Text) in the first node are never
+    shown.
+
+FILEBROWSER_BackgroundPen (int32) - ISG
+
+    Pen used to fill the background in icon mode. Default -1: the background
+    pen of the first node (when the list uses custom pens) or BACKGROUNDPEN.
+
+FILEBROWSER_IconHook (struct Hook *) - ISG
+
+    Icon mode: a hook that returns a full size icon for a node. The icon is
+    drawn at its original size instead of the node's LBNCA_Image.
+
+    Called as CallHookPkt(hook, gadget, node). It must return a struct
+    DiskObject * owned by the application that stays valid while the node
+    is in the list, or NULL to use the node's image. The hook can be called
+    from input.device while rendering: it must not do any DOS I/O. Load the
+    icons beforehand, or in the background, and refresh the gadget when they
+    are ready.
+
+
+Behaviour in icon mode
+----------------------
+
+Attributes:
+
+ - Selection related attributes keep working: LISTBROWSER_Selected,
+   SelectedNode, NumSelected, RelEvent, Top, MakeVisible, Position,
+   MultiSelect, PersistSelect and TotalNodes. Selections carry over when the
+   mode is switched.
+ - Changes made with OM_SET/OM_UPDATE also reach listbrowser.gadget (without
+   rendering), so its state is current when switching back to details mode.
+
+Mouse:
+
+ - A click selects a cell. With LISTBROWSER_MultiSelect, Shift toggles a
+   cell's selection.
+ - A double-click sends LBRE_DOUBLECLICK, as in details mode.
+ - Dragging from empty space draws a lasso (rubber band) that selects the
+   cells inside it. With Shift the lasso adds to the selection.
+ - Dragging from a cell does not change the selection. An application's own
+   drag & drop handling works on it as it does in details mode.
+ - Pressing on a cell that is part of a multiple selection keeps the
+   selection, so the whole selection can be dragged. A release without
+   moving the mouse narrows the selection to that cell.
+ - The mouse wheel scrolls the view.
+
+Drawing:
+
+ - The cell area is drawn into an offscreen bitmap and blitted in one go, so
+   scrolling doesn't flicker. Without memory for the buffer it draws directly
+   into a clip region.
+
+
+Not done yet
+------------
+
+ - Column titles in icon mode (for sorting).
+ - Per column text justification in the cells.
+ - Keyboard navigation in the cell grid.
+ - Hierarchical lists in icon mode. The project only asks for flat lists.
