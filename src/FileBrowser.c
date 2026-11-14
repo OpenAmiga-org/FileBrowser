@@ -29,6 +29,7 @@
 **
 ** Change history:
 **  2026-11-14 orgin, created
+**  2026-11-14 orgin, FILEBROWSER_IconSize
 */
 
 #include <exec/types.h>
@@ -65,6 +66,7 @@ struct FBData
  uint32 hiddenColumns;
  int32  bgPen;
  struct Hook *iconHook;
+ uint32 iconSize;                 /* FILEBROWSER_IconSize, 0 = original size */
  BOOL   multiSelect;
  BOOL   persistSelect;
 
@@ -198,10 +200,13 @@ static struct DiskObject *NodeIcon(struct FBData *d, Object *o, struct Node *nod
 }
 
 /*
-** Size of what is drawn for a node: its icon at original size, else
-** its image. Returns 0x0 for a node with neither.
+** Size of what is drawn for a node: its icon (at original size, or scaled
+** down to fit FILEBROWSER_IconSize), else its image. Returns 0x0 for a node
+** with neither.
+**
+** Returns TRUE if the icon must be drawn scaled to w x h.
 */
-static void NodeVisualSize(struct FBData *d, Object *o, struct RastPort *rp, struct Node *node, int32 *w, int32 *h)
+static BOOL NodeVisualSize(struct FBData *d, Object *o, struct RastPort *rp, struct Node *node, int32 *w, int32 *h)
 {
  struct DiskObject *dobj = NodeIcon(d, o, node);
  *w = *h = 0;
@@ -210,9 +215,29 @@ static void NodeVisualSize(struct FBData *d, Object *o, struct RastPort *rp, str
   struct Rectangle r;
   if(IIcon->GetIconRectangle(rp, dobj, NULL, &r, ICONDRAWA_Borderless, TRUE, TAG_DONE))
   {
+   int32 max = (int32)d->iconSize;
+
    *w = r.MaxX - r.MinX + 1;
    *h = r.MaxY - r.MinY + 1;
-   return;
+   /* larger icons are scaled down, keeping the aspect ratio; smaller ones
+      are never scaled up */
+   if(max > 0 && (*w > max || *h > max))
+   {
+    if(*w >= *h)
+    {
+     *h = *h * max / *w;
+     *w = max;
+    }
+    else
+    {
+     *w = *w * max / *h;
+     *h = max;
+    }
+    if(*w < 1) *w = 1;
+    if(*h < 1) *h = 1;
+    return TRUE;
+   }
+   return FALSE;
   }
  }
  {
@@ -223,6 +248,7 @@ static void NodeVisualSize(struct FBData *d, Object *o, struct RastPort *rp, str
    *h = image->Height;
   }
  }
+ return FALSE;
 }
 
 /****************************************************************************/
@@ -505,13 +531,17 @@ static void DrawCells(struct FBData *d, Object *o, struct DrawInfo *dri, struct 
   {
    struct DiskObject *dobj = NodeIcon(d, o, n);
    int32 w, h;
-   NodeVisualSize(d, o, rp, n, &w, &h);
+   BOOL scaled = NodeVisualSize(d, o, rp, n, &w, &h);
    if(dobj && w > 0)
    {
-    /* original size, with its own alpha; bottom aligned like Workbench */
+    /* with its own alpha; bottom aligned like Workbench. icon.library
+       caches the scaled imagery in the icon. */
     IIcon->DrawIconState(rp, dobj, NULL, b.Left + (b.Width - w) / 2, y + d->imgH - h,
                          sel ? IDS_SELECTED : IDS_NORMAL,
-                         ICONDRAWA_Borderless, TRUE, ICONDRAWA_EraseBackground, FALSE, TAG_DONE);
+                         ICONDRAWA_Borderless, TRUE, ICONDRAWA_EraseBackground, FALSE,
+                         scaled ? ICONDRAWA_Width : TAG_IGNORE, w,
+                         scaled ? ICONDRAWA_Height : TAG_IGNORE, h,
+                         TAG_DONE);
    }
    else if((image = NodeImage(n)))
    {
@@ -697,6 +727,10 @@ static BOOL SetAttrs(struct FBData *d, struct TagItem *tags, BOOL *modeChanged)
     break;
    case FILEBROWSER_IconHook:
     d->iconHook = (struct Hook *)tag->ti_Data;
+    redraw = TRUE;
+    break;
+   case FILEBROWSER_IconSize:
+    d->iconSize = tag->ti_Data;
     redraw = TRUE;
     break;
    case LISTBROWSER_Labels:
@@ -1120,6 +1154,7 @@ static uint32 Dispatch(Class *cl, Object *o, Msg msg)
     case FILEBROWSER_HiddenColumns: *opg->opg_Storage = d->hiddenColumns; return TRUE;
     case FILEBROWSER_BackgroundPen: *opg->opg_Storage = (uint32)d->bgPen; return TRUE;
     case FILEBROWSER_IconHook:      *opg->opg_Storage = (uint32)d->iconHook; return TRUE;
+    case FILEBROWSER_IconSize:      *opg->opg_Storage = d->iconSize; return TRUE;
    }
    if(d->mode == FBVM_ICONS)
    {

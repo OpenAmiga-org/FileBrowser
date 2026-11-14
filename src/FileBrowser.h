@@ -13,6 +13,7 @@
 **
 ** Change history:
 **  2026-11-14 orgin, created
+**  2026-11-14 orgin, FILEBROWSER_IconSize
 */
 
 #ifndef FILEBROWSER_H
@@ -43,6 +44,12 @@
    stays valid (owned by the application) or NULL to use the node's image.
    It may be called from input.device: no DOS I/O in the hook. */
 #define FILEBROWSER_IconHook     (FILEBROWSER_Dummy + 5)
+
+/* (uint32, ISG) Icon mode: largest size in pixels (width and height) of the
+   icons from FILEBROWSER_IconHook. Larger icons are drawn scaled down,
+   keeping their aspect ratio; smaller ones are drawn at their original size.
+   Default 0: every icon at its original size. */
+#define FILEBROWSER_IconSize     (FILEBROWSER_Dummy + 6)
 
 enum
 {

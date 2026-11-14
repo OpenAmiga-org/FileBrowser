@@ -122,6 +122,15 @@ FILEBROWSER_IconHook (struct Hook *) - ISG
     are ready.
 
 
+FILEBROWSER_IconSize (uint32) - ISG
+
+    Icon mode: the largest width and height, in pixels, of the icons from
+    FILEBROWSER_IconHook. Larger icons are drawn scaled down to fit, keeping
+    their aspect ratio. Smaller icons are drawn at their original size, as
+    scaled up icons rarely look good. Default 0: every icon at its original
+    size. icon.library caches the scaled imagery in each icon.
+
+
 Behaviour in icon mode
 ----------------------
 
