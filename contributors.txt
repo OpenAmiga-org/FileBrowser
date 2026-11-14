@@ -1,3 +1,4 @@
 Contributors:
 
  Björn Hagström 'Orgin':      Original FileBrowser implementation
+ Claude (Anthropic):          Coding, documentation
