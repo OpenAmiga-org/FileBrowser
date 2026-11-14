@@ -124,11 +124,19 @@ FILEBROWSER_IconHook (struct Hook *) - ISG
 
 FILEBROWSER_IconSize (uint32) - ISG
 
-    Icon mode: the largest width and height, in pixels, of the icons from
-    FILEBROWSER_IconHook. Larger icons are drawn scaled down to fit, keeping
-    their aspect ratio. Smaller icons are drawn at their original size, as
-    scaled up icons rarely look good. Default 0: every icon at its original
-    size. icon.library caches the scaled imagery in each icon.
+    Icon mode: the size in pixels of the image box of every cell, like an
+    icon grid. Icons from FILEBROWSER_IconHook that are larger are drawn
+    scaled down to fit, keeping their aspect ratio. Smaller icons are drawn
+    at their original size, bottom aligned, as scaled up icons rarely look
+    good. icon.library caches the scaled imagery in each icon.
+
+    With a fixed box the cells keep their size while the application loads
+    icons in the background (the node's LBNCA_Image is drawn until the hook
+    returns an icon) or when icons change.
+
+    Default 0: no fixed box. Every icon is drawn at its original size and
+    the box is as large as the largest image or icon shown, so the cells
+    grow when larger icons arrive.
 
 
 Behaviour in icon mode

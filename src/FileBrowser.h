@@ -14,6 +14,7 @@
 ** Change history:
 **  2026-11-14 orgin, created
 **  2026-11-14 orgin, FILEBROWSER_IconSize
+**  2026-11-14 orgin, FILEBROWSER_IconSize sets a fixed image box
 */
 
 #ifndef FILEBROWSER_H
@@ -45,10 +46,12 @@
    It may be called from input.device: no DOS I/O in the hook. */
 #define FILEBROWSER_IconHook     (FILEBROWSER_Dummy + 5)
 
-/* (uint32, ISG) Icon mode: largest size in pixels (width and height) of the
-   icons from FILEBROWSER_IconHook. Larger icons are drawn scaled down,
-   keeping their aspect ratio; smaller ones are drawn at their original size.
-   Default 0: every icon at its original size. */
+/* (uint32, ISG) Icon mode: size in pixels of the image box of every cell.
+   Icons from FILEBROWSER_IconHook that are larger are drawn scaled down,
+   keeping their aspect ratio; smaller ones are drawn at their original size,
+   bottom aligned. The cells keep their size while icons load or change.
+   Default 0: no fixed box, every icon at its original size and the box as
+   large as the largest one shown. */
 #define FILEBROWSER_IconSize     (FILEBROWSER_Dummy + 6)
 
 enum

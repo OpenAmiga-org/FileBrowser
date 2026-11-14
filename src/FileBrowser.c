@@ -30,6 +30,7 @@
 ** Change history:
 **  2026-11-14 orgin, created
 **  2026-11-14 orgin, FILEBROWSER_IconSize
+**  2026-11-14 orgin, FILEBROWSER_IconSize sets a fixed image box
 */
 
 #include <exec/types.h>
@@ -311,13 +312,24 @@ static void Layout(struct FBData *d, Object *o, struct RastPort *rp)
     }
    }
   }
-  for(n = d->labels->lh_Head; n->ln_Succ; n = n->ln_Succ)
+  if(d->iconSize > 0)
   {
-   int32 w, h;
-   NodeVisualSize(d, o, rp, n, &w, &h);
-   if(h > d->imgH) d->imgH = h;
-   if(w + 2 * FB_PAD > d->cellW) d->cellW = w + 2 * FB_PAD; /* wide icons widen all cells */
-   d->total++;
+   /* fixed image box: the cells keep their size while icons load or change */
+   d->imgH = d->iconSize;
+   if(d->iconSize + 2 * FB_PAD > (uint32)d->cellW) d->cellW = d->iconSize + 2 * FB_PAD;
+   d->total = CountNodes(d->labels);
+  }
+  else
+  {
+   /* image box from the largest image or icon shown */
+   for(n = d->labels->lh_Head; n->ln_Succ; n = n->ln_Succ)
+   {
+    int32 w, h;
+    NodeVisualSize(d, o, rp, n, &w, &h);
+    if(h > d->imgH) d->imgH = h;
+    if(w + 2 * FB_PAD > d->cellW) d->cellW = w + 2 * FB_PAD; /* wide icons widen all cells */
+    d->total++;
+   }
   }
  }
  if(d->imgH > FB_MAXIMAGE) d->imgH = FB_MAXIMAGE;
@@ -545,8 +557,9 @@ static void DrawCells(struct FBData *d, Object *o, struct DrawInfo *dri, struct 
    }
    else if((image = NodeImage(n)))
    {
+    /* bottom aligned like the icons, so nothing moves when an icon replaces it */
     IIntuition->DrawImageState(rp, image, b.Left + (b.Width - image->Width) / 2,
-                               y + (d->imgH - image->Height) / 2, sel ? IDS_SELECTED : IDS_NORMAL, dri);
+                               y + d->imgH - image->Height, sel ? IDS_SELECTED : IDS_NORMAL, dri);
    }
   }
   if(d->imgH) y += d->imgH + FB_PAD;
