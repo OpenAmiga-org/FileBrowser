@@ -10,6 +10,8 @@
 ** For more information look at:
 ** http://openamiga.org/?function=viewproject&projectid=52
 **
+** Public domain: see LICENSE in the release archive.
+**
 **  FBVM_DETAILS (default): every method goes to listbrowser.gadget, so the
 **  gadget looks and behaves exactly like a ListBrowser.
 **
@@ -32,6 +34,7 @@
 **  2026-11-14 orgin, FILEBROWSER_IconSize
 **  2026-11-14 orgin, FILEBROWSER_IconSize sets a fixed image box
 **  2026-11-15 orgin, the selection box follows the pointer below the last row
+**  2026-11-15 orgin, 1.0 (public domain)
 */
 
 #include <exec/types.h>

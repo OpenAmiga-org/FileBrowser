@@ -12,8 +12,11 @@
 ** For more information look at:
 ** http://openamiga.org/?function=viewproject&projectid=52
 **
+** Public domain: see LICENSE in the release archive.
+**
 ** Change history:
 **  2026-11-14 orgin, created
+**  2026-11-15 orgin, 1.2 with FileBrowser 1.0
 */
 
 #include <exec/types.h>
@@ -41,7 +44,7 @@
 #include "FileBrowser.h"
 
 static const char __attribute__((used)) verstag[] =
- "\0$VER: FileBrowserDemo 1.1 (14.11.2026)\0";
+ "\0$VER: FileBrowserDemo 1.2 (15.11.2026)\0";
 
 /* Interfaces used by the FileBrowser class and by this program */
 struct Library *IntuitionBase, *GfxBase, *LayersBase, *UtilityBase, *IconBase;
