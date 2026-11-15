@@ -31,6 +31,7 @@
 **  2026-11-14 orgin, created
 **  2026-11-14 orgin, FILEBROWSER_IconSize
 **  2026-11-14 orgin, FILEBROWSER_IconSize sets a fixed image box
+**  2026-11-15 orgin, the selection box follows the pointer below the last row
 */
 
 #include <exec/types.h>
@@ -1034,7 +1035,13 @@ static uint32 HandleInput(Class *cl, Object *o, struct gpInput *gpi)
       if(x >= d->area.Left + d->area.Width) x = d->area.Left + d->area.Width - 1;
       ny = y - d->area.Top + d->topY;
       if(ny < 0) ny = 0;
-      if(ny > d->contentH) ny = d->contentH;
+      /* the box follows the pointer down to the bottom of the view, also
+         in the empty space below the last row of cells */
+      {
+       int32 bottom = d->topY + d->area.Height - 1;
+       if(bottom < d->contentH) bottom = d->contentH;
+       if(ny > bottom) ny = bottom;
+      }
       d->lx1 = x;
       d->ly1 = ny;
       LassoSelect(d);

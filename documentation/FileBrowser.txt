@@ -157,7 +157,9 @@ Mouse:
    cell's selection.
  - A double-click sends LBRE_DOUBLECLICK, as in details mode.
  - Dragging from empty space draws a lasso (rubber band) that selects the
-   cells inside it. With Shift the lasso adds to the selection.
+   cells inside it. It follows the pointer anywhere in the view, also in
+   the empty space below the last row. With Shift the lasso adds to the
+   selection.
  - Dragging from a cell does not change the selection. An application's own
    drag & drop handling works on it as it does in details mode.
  - Pressing on a cell that is part of a multiple selection keeps the
