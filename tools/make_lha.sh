@@ -4,7 +4,7 @@
 #   tools/make_lha.sh
 #
 # FileBrowser/
-#   FileBrowser.readme, LICENSE, contributors.txt
+#   FileBrowser.readme, LICENSE
 #   Autodocs/FileBrowser.doc
 #   Include/FileBrowser.h
 #   Source/FileBrowser.c
@@ -30,7 +30,7 @@ D="$STAGE/FileBrowser"
 rm -rf "$STAGE"
 mkdir -p "$D/Autodocs" "$D/Include" "$D/Source" "$D/Demo"
 
-cp "$ROOT/package/FileBrowser.readme" "$ROOT/LICENSE" "$ROOT/contributors.txt" "$D/"
+cp "$ROOT/package/FileBrowser.readme" "$ROOT/LICENSE" "$D/"
 cp "$ROOT/documentation/FileBrowser.doc" "$D/Autodocs/"
 cp "$ROOT/src/FileBrowser.h" "$D/Include/"
 cp "$ROOT/src/FileBrowser.c" "$D/Source/"
