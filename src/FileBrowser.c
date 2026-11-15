@@ -40,7 +40,9 @@
 **             wheel keeps the scroll position in range and moves the
 **             lasso's corner with the pointer, also while the gadget is
 **             active (IECLASS_MOUSEWHEEL in GM_HANDLEINPUT); the corner
-**             stays inside the view while it scrolls past the top or bottom
+**             stays inside the view while it scrolls past the top or bottom;
+**             icon mode paints the gaps around the cells and the scroll bar
+**             (the list view showed through there)
 */
 
 #include <exec/types.h>
@@ -613,6 +615,26 @@ static BOOL EnsureBuffer(struct FBData *d, struct RastPort *rp, int32 w, int32 h
 }
 
 /*
+** Fill the pixels between the outer bevel, the cell area and the scroll
+** bar, which nothing else in icon mode draws: without this the list view's
+** frame and scroller showed through there after switching views.
+*/
+static void FillGaps(struct FBData *d, struct RastPort *rp, uint16 bg)
+{
+ int32 x0 = d->box.Left + 1, y0 = d->box.Top + 1;
+ int32 x1 = d->box.Left + d->box.Width - 2, y1 = d->box.Top + d->box.Height - 2;
+ int32 areaR = d->area.Left + d->area.Width;   /* first column right of the cells */
+ int32 sbR = d->sb.Left + d->sb.Width;          /* first column right of the scroll bar */
+ if(x1 < x0 || y1 < y0) return;
+ IGraphics->SetAPen(rp, bg);
+ IGraphics->RectFill(rp, x0, y0, x1, y0);                        /* top */
+ IGraphics->RectFill(rp, x0, y1, x1, y1);                        /* bottom */
+ IGraphics->RectFill(rp, x0, y0, x0, y1);                        /* left */
+ if(areaR <= d->sb.Left - 1) IGraphics->RectFill(rp, areaR, y0, d->sb.Left - 1, y1); /* cells | bar */
+ if(sbR <= x1) IGraphics->RectFill(rp, sbR, y0, x1, y1);         /* right of the bar */
+}
+
+/*
 ** Render the icon view: cells into the offscreen buffer, then blitted
 ** to the window in one go so scrolling does not flicker. Falls back to
 ** drawing directly into a clip region without a buffer.
@@ -640,8 +662,10 @@ static void RenderIcons(struct FBData *d, Object *o, struct GadgetInfo *gi, stru
   if(flags & LBFLG_CUSTOMPENS) bg = pen;
  }
 
- /* outer bevel like a listbrowser frame */
+ /* outer bevel like a listbrowser frame, and the pixels between it, the
+    cells and the scroll bar */
  Bevel(rp, dri, &d->box, TRUE);
+ FillGaps(d, rp, bg);
 
  /* Double buffered: draw the cells offscreen and copy them in one blit, so
     scrolling doesn't flicker. The buffer has one cell height of room above

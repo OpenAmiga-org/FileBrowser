@@ -126,6 +126,8 @@ History
    box's corner stays inside the view while it scrolls, so the box is
    always seen.
  - The mouse wheel also scrolls while a selection box is dragged.
+ - Icon view paints the thin gaps around the cells and the scroll bar;
+   bits of the list view showed through there after switching views.
 
 1.0 (15.11.2026)
  - First release.
