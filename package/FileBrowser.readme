@@ -11,7 +11,7 @@ replaces:
 requirements: AmigaOS 4.1 SDK
 license: Public domain
 minosversion: 4.1
-texttype: Text
+texttype: Plain text
 distribute: yes
 hend:
 
