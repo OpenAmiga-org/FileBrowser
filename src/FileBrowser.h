@@ -18,6 +18,7 @@
 **  2026-11-14 orgin, FILEBROWSER_IconSize
 **  2026-11-14 orgin, FILEBROWSER_IconSize sets a fixed image box
 **  2026-11-15 orgin, 1.0: FILEBROWSER_VERSION/REVISION, public domain
+**  2026-11-15 orgin, 1.1
 */
 
 #ifndef FILEBROWSER_H
@@ -25,9 +26,9 @@
 
 #include <intuition/classes.h>
 
-/* The release this header belongs to (1.0) */
+/* The release this header belongs to (1.1) */
 #define FILEBROWSER_VERSION  1
-#define FILEBROWSER_REVISION 0
+#define FILEBROWSER_REVISION 1
 
 #define FILEBROWSER_Dummy        (TAG_USER + 0x46420000) /* 'FB' */
 

@@ -7,7 +7,7 @@ filebrowser/--datasheet--                       filebrowser/--datasheet--
 
     NAME
 	FileBrowser -- listbrowser.gadget subclass with an icon (cell)
-	view mode. (1.0)
+	view mode. (1.1)
 
     SUPERCLASS
 	listbrowser.gadget

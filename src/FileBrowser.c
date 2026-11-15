@@ -35,6 +35,12 @@
 **  2026-11-14 orgin, FILEBROWSER_IconSize sets a fixed image box
 **  2026-11-15 orgin, the selection box follows the pointer below the last row
 **  2026-11-15 orgin, 1.0 (public domain)
+**  2026-11-15 orgin, 1.1: the lasso is drawn only inside the view (scrolling
+**             with the wheel while dragging one left lines outside it); the
+**             wheel keeps the scroll position in range and moves the
+**             lasso's corner with the pointer, also while the gadget is
+**             active (IECLASS_MOUSEWHEEL in GM_HANDLEINPUT); the corner
+**             stays inside the view while it scrolls past the top or bottom
 */
 
 #include <exec/types.h>
@@ -692,11 +698,20 @@ static void Redraw(struct FBData *d, Object *o, struct GadgetInfo *gi)
    int32 y0 = (d->ly0 < d->ly1 ? d->ly0 : d->ly1) - d->topY + d->area.Top;
    int32 y1 = (d->ly0 < d->ly1 ? d->ly1 : d->ly0) - d->topY + d->area.Top;
    int32 top = d->area.Top, bottom = d->area.Top + d->area.Height - 1;
-   if(y0 < top) y0 = top;
-   if(y1 > bottom) y1 = bottom;
-   IGraphics->SetAPen(rp, gi->gi_DrInfo->dri_Pens[TEXTPEN]);
-   IGraphics->Move(rp, x0, y0); IGraphics->Draw(rp, x1, y0); IGraphics->Draw(rp, x1, y1);
-   IGraphics->Draw(rp, x0, y1); IGraphics->Draw(rp, x0, y0);
+   /* only the part inside the view: an edge scrolled out of it is not
+      drawn, the sides end at the view's border (the window rastport is
+      not clipped to the gadget) */
+   if(y1 >= top && y0 <= bottom)
+   {
+    BOOL topEdge = y0 >= top, bottomEdge = y1 <= bottom;
+    if(y0 < top) y0 = top;
+    if(y1 > bottom) y1 = bottom;
+    IGraphics->SetAPen(rp, gi->gi_DrInfo->dri_Pens[TEXTPEN]);
+    if(topEdge) { IGraphics->Move(rp, x0, y0); IGraphics->Draw(rp, x1, y0); }
+    if(bottomEdge) { IGraphics->Move(rp, x0, y1); IGraphics->Draw(rp, x1, y1); }
+    IGraphics->Move(rp, x0, y0); IGraphics->Draw(rp, x0, y1);
+    IGraphics->Move(rp, x1, y0); IGraphics->Draw(rp, x1, y1);
+   }
   }
   IIntuition->ReleaseGIRPort(rp);
  }
@@ -956,6 +971,35 @@ static uint32 GoActive(Class *cl, Object *o, struct gpInput *gpi)
 }
 
 /*
+** Move the lasso's free corner to the pointer (window coordinates x, y),
+** keeping the scroll position valid, and select the cells inside.
+*/
+static void LassoToPointer(struct FBData *d, int32 x, int32 y)
+{
+ int32 ny;
+ if(d->topY > MaxTop(d)) d->topY = MaxTop(d);
+ if(d->topY < 0) d->topY = 0;
+ /* the corner stays inside the view (it scrolls while the pointer is
+    past the top or bottom), so the box is always seen */
+ if(x < d->area.Left) x = d->area.Left;
+ if(x >= d->area.Left + d->area.Width) x = d->area.Left + d->area.Width - 1;
+ if(y < d->area.Top) y = d->area.Top;
+ if(y >= d->area.Top + d->area.Height) y = d->area.Top + d->area.Height - 1;
+ ny = y - d->area.Top + d->topY;
+ if(ny < 0) ny = 0;
+ /* the box follows the pointer down to the bottom of the view, also
+    in the empty space below the last row of cells */
+ {
+  int32 bottom = d->topY + d->area.Height - 1;
+  if(bottom < d->contentH) bottom = d->contentH;
+  if(ny > bottom) ny = bottom;
+ }
+ d->lx1 = x;
+ d->ly1 = ny;
+ LassoSelect(d);
+}
+
+/*
 ** GM_HANDLEINPUT in icon mode: mouse moves while active (scroll bar
 ** drag, lasso, drag detection) and the button release.
 **
@@ -969,6 +1013,18 @@ static uint32 HandleInput(Class *cl, Object *o, struct gpInput *gpi)
  int32 y = d->box.Top + gpi->gpi_Mouse.Y;
 
  if(ie == NULL) return GMR_MEACTIVE;
+
+ /* the wheel while the gadget is active (dragging a lasso): scroll, and
+    the lasso's corner stays at the pointer */
+ if(ie->ie_Class == IECLASS_MOUSEWHEEL && ie->ie_Y != 0)
+ {
+  d->topY += ie->ie_Y * (d->cellH / 2 > 8 ? d->cellH / 2 : 8);
+  if(d->topY > MaxTop(d)) d->topY = MaxTop(d);
+  if(d->topY < 0) d->topY = 0;
+  if(d->lasso) LassoToPointer(d, x, y);
+  Redraw(d, o, gpi->gpi_GInfo);
+  return GMR_MEACTIVE;
+ }
 
  if(ie->ie_Class == IECLASS_RAWMOUSE)
  {
@@ -1028,26 +1084,10 @@ static uint32 HandleInput(Class *cl, Object *o, struct gpInput *gpi)
      }
      if(d->lasso && active)
      {
-      int32 ny;
       /* scroll when dragging past the top or bottom */
       if(y < d->area.Top) d->topY -= d->lineH;
       else if(y >= d->area.Top + d->area.Height) d->topY += d->lineH;
-      if(d->topY > MaxTop(d)) d->topY = MaxTop(d);
-      if(d->topY < 0) d->topY = 0;
-      if(x < d->area.Left) x = d->area.Left;
-      if(x >= d->area.Left + d->area.Width) x = d->area.Left + d->area.Width - 1;
-      ny = y - d->area.Top + d->topY;
-      if(ny < 0) ny = 0;
-      /* the box follows the pointer down to the bottom of the view, also
-         in the empty space below the last row of cells */
-      {
-       int32 bottom = d->topY + d->area.Height - 1;
-       if(bottom < d->contentH) bottom = d->contentH;
-       if(ny > bottom) ny = bottom;
-      }
-      d->lx1 = x;
-      d->ly1 = ny;
-      LassoSelect(d);
+      LassoToPointer(d, x, y);
       Redraw(d, o, gpi->gpi_GInfo);
      }
     }
@@ -1069,7 +1109,13 @@ static uint32 HandleScroll(Class *cl, Object *o, struct gpInput *gpi)
  struct InputEvent *ie = gpi->gpi_IEvent;
  if(ie && ie->ie_Class == IECLASS_MOUSEWHEEL && ie->ie_Y != 0)
  {
+  struct Window *win = gpi->gpi_GInfo ? gpi->gpi_GInfo->gi_Window : NULL;
   d->topY += ie->ie_Y * (d->cellH / 2 > 8 ? d->cellH / 2 : 8);
+  if(d->topY > MaxTop(d)) d->topY = MaxTop(d);
+  if(d->topY < 0) d->topY = 0;
+  /* scrolling while a lasso is dragged: its free corner stays at the
+     pointer, so the box grows or shrinks with the content */
+  if(d->lasso && win) LassoToPointer(d, win->MouseX, win->MouseY);
   Redraw(d, o, gpi->gpi_GInfo);
  }
  return GMR_NOREUSE;

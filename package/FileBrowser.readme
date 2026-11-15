@@ -1,6 +1,6 @@
 name: FileBrowser
 description: ListBrowser subclass with an icon view (dev)
-version: 1.0
+version: 1.1
 date: 15.11.2026
 author: Björn Hagström
 submitter: Björn Hagström
@@ -15,7 +15,7 @@ texttype: Text
 distribute: yes
 hend:
 
-FileBrowser 1.0 - a ListBrowser with an icon view
+FileBrowser 1.1 - a ListBrowser with an icon view
 =================================================
 
 FileBrowser is a subclass of listbrowser.gadget that can also show its list
@@ -119,6 +119,13 @@ leave out credits if you like. See LICENSE.
 
 History
 -------
+
+1.1 (15.11.2026)
+ - Dragging a selection box past the top or bottom of the view (which
+   scrolls it) no longer draws lines of the box outside the view. The
+   box's corner stays inside the view while it scrolls, so the box is
+   always seen.
+ - The mouse wheel also scrolls while a selection box is dragged.
 
 1.0 (15.11.2026)
  - First release.
