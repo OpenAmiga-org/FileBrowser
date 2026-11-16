@@ -43,6 +43,10 @@
 **             stays inside the view while it scrolls past the top or bottom;
 **             icon mode paints the gaps around the cells and the scroll bar
 **             (the list view showed through there)
+**  2026-11-16 orgin, 1.2: icon mode uses scroller.gadget for its scroll bar,
+**             like the list view (own bar only if the class can't be
+**             opened); everything icon mode draws is clipped to the gadget
+**             and to the inside of the window's borders
 */
 
 #include <exec/types.h>
@@ -55,6 +59,7 @@
 #include <graphics/regions.h>
 #include <workbench/icon.h>
 #include <gadgets/listbrowser.h>
+#include <gadgets/scroller.h>
 
 #include <proto/exec.h>
 #include <proto/intuition.h>
@@ -68,7 +73,8 @@
 
 #define FB_MAXCOLS   16
 #define FB_PAD        3   /* space around cell contents */
-#define FB_SBWIDTH   16   /* own scroll bar in icon mode */
+#define FB_SBWIDTH   16   /* own scroll bar in icon mode, without scroller.gadget */
+#define FB_SBMAX  30000   /* scroller.gadget values are WORDs */
 #define FB_MAXIMAGE 256   /* taller images are clipped */
 
 struct FBData
@@ -98,15 +104,67 @@ struct FBData
  BOOL   moved, collapseOnRelease;
  BOOL   sbDrag;
  int32  sbGrab;
+ Object *scroller;                /* scroller.gadget in icon mode (NULL: own bar) */
+ BOOL   sbChild;                  /* the scroller is the active part */
+ int32  sbUnit;                   /* pixels per scroller unit */
+ int32  sbW;                      /* the scroller's width, 0 = not asked yet */
  BOOL   lasso, lassoAdd;          /* rubber band selection from empty space */
  struct BitMap *buf;              /* offscreen buffer for the cell area */
  int32  bufW, bufH;
  int32  lx0, ly0, lx1, ly1;       /* lasso corners, content coordinates */
 };
 
+static struct Library *ScrollerClassBase; /* keeps the scroller.gadget class loaded */
+
 /****************************************************************************/
 /* helpers                                                                  */
 /****************************************************************************/
+
+/*
+** Limit drawing in rp to the rectangle (and to what was allowed before).
+**
+** Returns the clip region to give to PopClip(), which puts the old one back.
+*/
+static struct Region *PushClip(struct RastPort *rp, struct Rectangle *r, struct Region **old)
+{
+ struct Region *region;
+ struct Layer *layer = rp->Layer;
+ *old = NULL;
+ if(layer == NULL || r->MaxX < r->MinX || r->MaxY < r->MinY) return NULL;
+ if((region = IGraphics->NewRegion()) == NULL) return NULL;
+ IGraphics->OrRectRegion(region, r);
+ *old = ILayers->InstallClipRegion(layer, NULL);
+ if(*old) IGraphics->AndRegionRegion(*old, region);
+ ILayers->InstallClipRegion(layer, region);
+ return region;
+}
+
+static void PopClip(struct RastPort *rp, struct Region *region, struct Region *old)
+{
+ if(region == NULL) return;
+ ILayers->InstallClipRegion(rp->Layer, old);
+ IGraphics->DisposeRegion(region);
+}
+
+/*
+** The gadget's box inside the window's borders: icon mode never draws
+** outside it.
+*/
+static void GadgetClip(struct FBData *d, struct GadgetInfo *gi, struct Rectangle *r)
+{
+ struct Window *win = gi ? gi->gi_Window : NULL;
+ r->MinX = d->box.Left;
+ r->MinY = d->box.Top;
+ r->MaxX = d->box.Left + d->box.Width - 1;
+ r->MaxY = d->box.Top + d->box.Height - 1;
+ if(win && !(win->Flags & WFLG_GIMMEZEROZERO))
+ {
+  if(r->MinX < win->BorderLeft) r->MinX = win->BorderLeft;
+  if(r->MinY < win->BorderTop) r->MinY = win->BorderTop;
+  if(r->MaxX > win->Width - win->BorderRight - 1) r->MaxX = win->Width - win->BorderRight - 1;
+  if(r->MaxY > win->Height - win->BorderBottom - 1) r->MaxY = win->Height - win->BorderBottom - 1;
+ }
+}
 
 /*
 ** Node at position index (0 = first) of list.
@@ -274,7 +332,7 @@ static BOOL NodeVisualSize(struct FBData *d, Object *o, struct RastPort *rp, str
 **
 ** Must be called before rendering or hit testing in icon mode.
 */
-static void Layout(struct FBData *d, Object *o, struct RastPort *rp)
+static void Layout(struct FBData *d, Object *o, struct GadgetInfo *gi, struct RastPort *rp)
 {
  struct Gadget *g = (struct Gadget *)o;
  struct TextFont *font = rp->Font;
@@ -287,7 +345,20 @@ static void Layout(struct FBData *d, Object *o, struct RastPort *rp)
  d->box.Width = g->Width;
  d->box.Height = g->Height;
 
- d->sb.Width = FB_SBWIDTH;
+ /* the system scroller's own width, as in the list view */
+ if(d->scroller && d->sbW == 0 && gi)
+ {
+  struct gpDomain gpd;
+  gpd.MethodID = GM_DOMAIN;
+  gpd.gpd_GInfo = gi;
+  gpd.gpd_RPort = rp;
+  gpd.gpd_Which = GDOMAIN_NOMINAL;
+  gpd.gpd_Domain.Left = gpd.gpd_Domain.Top = gpd.gpd_Domain.Width = gpd.gpd_Domain.Height = 0;
+  gpd.gpd_Attrs = NULL;
+  IIntuition->IDoMethodA(d->scroller, (Msg)&gpd);
+  d->sbW = gpd.gpd_Domain.Width > 4 && gpd.gpd_Domain.Width < 64 ? gpd.gpd_Domain.Width : FB_SBWIDTH;
+ }
+ d->sb.Width = d->scroller && d->sbW ? d->sbW : FB_SBWIDTH;
  d->sb.Height = d->box.Height - 4;
  d->sb.Left = d->box.Left + d->box.Width - 2 - FB_SBWIDTH;
  d->sb.Top = d->box.Top + 2;
@@ -359,6 +430,40 @@ static void Layout(struct FBData *d, Object *o, struct RastPort *rp)
  if(maxTop < 0) maxTop = 0;
  if(d->topY > maxTop) d->topY = maxTop;
  if(d->topY < 0) d->topY = 0;
+
+ if(d->scroller && !d->sbChild) /* while it is used it keeps its own position */
+ {
+  int32 delta;
+  d->sbUnit = d->contentH / FB_SBMAX + 1;
+  delta = (d->cellH / 2 > 8 ? d->cellH / 2 : 8) / d->sbUnit;
+  IIntuition->SetAttrs(d->scroller,
+   GA_Left, d->sb.Left, GA_Top, d->sb.Top, GA_Width, d->sb.Width, GA_Height, d->sb.Height,
+   SCROLLER_Total, d->contentH / d->sbUnit,
+   SCROLLER_Visible, areaH / d->sbUnit,
+   SCROLLER_Top, d->topY / d->sbUnit,
+   SCROLLER_ArrowDelta, delta > 0 ? delta : 1,
+   TAG_DONE);
+ }
+}
+
+/*
+** Take the scroll position from the scroller (while it is used).
+**
+** Returns TRUE if it changed.
+*/
+static BOOL TopFromScroller(struct FBData *d)
+{
+ uint32 top = 0, total = 0, visible = 0;
+ int32 maxTop = d->contentH - d->area.Height, y;
+ if(d->scroller == NULL) return FALSE;
+ IIntuition->GetAttrs(d->scroller, SCROLLER_Top, &top, SCROLLER_Total, &total, SCROLLER_Visible, &visible, TAG_DONE);
+ if(maxTop < 0) maxTop = 0;
+ y = (int32)top * d->sbUnit;
+ if(top + visible >= total || y > maxTop) y = maxTop; /* the last unit reaches the exact bottom */
+ if(y < 0) y = 0;
+ if(y == d->topY) return FALSE;
+ d->topY = y;
+ return TRUE;
 }
 
 /*
@@ -462,10 +567,17 @@ static void Bevel(struct RastPort *rp, struct DrawInfo *dri, struct IBox *b, BOO
 /*
 ** Draw the icon mode scroll bar (frame and knob).
 */
-static void RenderScrollBar(struct FBData *d, struct RastPort *rp, struct DrawInfo *dri)
+static void RenderScrollBar(struct FBData *d, struct GadgetInfo *gi, struct RastPort *rp, struct DrawInfo *dri)
 {
  struct IBox knob;
  int32 maxTop = MaxTop(d);
+
+ if(d->scroller)
+ {
+  /* while it is being used it draws itself */
+  if(!d->sbChild) IIntuition->IDoMethod(d->scroller, GM_RENDER, gi, rp, GREDRAW_REDRAW);
+  return;
+ }
 
  IGraphics->SetAPen(rp, dri->dri_Pens[SHADOWPEN]);
  IGraphics->RectFill(rp, d->sb.Left, d->sb.Top, d->sb.Left + d->sb.Width - 1, d->sb.Top + d->sb.Height - 1);
@@ -645,9 +757,16 @@ static void RenderIcons(struct FBData *d, Object *o, struct GadgetInfo *gi, stru
  uint16 bg;
  int32 bufH;
 
+ struct Rectangle clip;
+ struct Region *region, *old;
+
  if(dri == NULL) return;
 
- Layout(d, o, rp);
+ Layout(d, o, gi, rp);
+
+ /* nothing is drawn outside the gadget or over the window's border */
+ GadgetClip(d, gi, &clip);
+ region = PushClip(rp, &clip, &old);
 
  /* background pen: given, or the first node's custom background */
  bg = dri->dri_Pens[BACKGROUNDPEN];
@@ -684,25 +803,20 @@ static void RenderIcons(struct FBData *d, Object *o, struct GadgetInfo *gi, stru
  else
  {
   /* no memory for a buffer: draw directly, clipped to the cell area */
-  struct Region *region = IGraphics->NewRegion(), *oldregion = NULL;
-  struct Layer *layer = rp->Layer;
-  if(region)
-  {
-   struct Rectangle r;
-   r.MinX = d->area.Left;
-   r.MinY = d->area.Top;
-   r.MaxX = d->area.Left + d->area.Width - 1;
-   r.MaxY = d->area.Top + d->area.Height - 1;
-   IGraphics->OrRectRegion(region, &r);
-   if(layer) oldregion = ILayers->InstallClipRegion(layer, region);
-  }
+  struct Rectangle r;
+  struct Region *cregion, *cold;
+  r.MinX = d->area.Left;
+  r.MinY = d->area.Top;
+  r.MaxX = d->area.Left + d->area.Width - 1;
+  r.MaxY = d->area.Top + d->area.Height - 1;
+  cregion = PushClip(rp, &r, &cold);
   DrawCells(d, o, dri, rp, bg, 0, 0, d->area.Left, d->area.Top,
             d->area.Left + d->area.Width - 1, d->area.Top + d->area.Height - 1);
-  if(layer && region) ILayers->InstallClipRegion(layer, oldregion);
-  if(region) IGraphics->DisposeRegion(region);
+  PopClip(rp, cregion, cold);
  }
 
- RenderScrollBar(d, rp, dri);
+ RenderScrollBar(d, gi, rp, dri);
+ PopClip(rp, region, old);
 }
 
 /*
@@ -718,23 +832,27 @@ static void Redraw(struct FBData *d, Object *o, struct GadgetInfo *gi)
   RenderIcons(d, o, gi, rp);
   if(d->lasso && gi->gi_DrInfo)
   {
+   struct Rectangle clip;
+   struct Region *region, *old;
    int32 x0 = d->lx0 < d->lx1 ? d->lx0 : d->lx1, x1 = d->lx0 < d->lx1 ? d->lx1 : d->lx0;
    int32 y0 = (d->ly0 < d->ly1 ? d->ly0 : d->ly1) - d->topY + d->area.Top;
    int32 y1 = (d->ly0 < d->ly1 ? d->ly1 : d->ly0) - d->topY + d->area.Top;
    int32 top = d->area.Top, bottom = d->area.Top + d->area.Height - 1;
    /* only the part inside the view: an edge scrolled out of it is not
-      drawn, the sides end at the view's border (the window rastport is
-      not clipped to the gadget) */
+      drawn, the sides end at the view's border */
    if(y1 >= top && y0 <= bottom)
    {
     BOOL topEdge = y0 >= top, bottomEdge = y1 <= bottom;
     if(y0 < top) y0 = top;
     if(y1 > bottom) y1 = bottom;
+    GadgetClip(d, gi, &clip);
+    region = PushClip(rp, &clip, &old);
     IGraphics->SetAPen(rp, gi->gi_DrInfo->dri_Pens[TEXTPEN]);
     if(topEdge) { IGraphics->Move(rp, x0, y0); IGraphics->Draw(rp, x1, y0); }
     if(bottomEdge) { IGraphics->Move(rp, x0, y1); IGraphics->Draw(rp, x1, y1); }
     IGraphics->Move(rp, x0, y0); IGraphics->Draw(rp, x0, y1);
     IGraphics->Move(rp, x1, y0); IGraphics->Draw(rp, x1, y1);
+    PopClip(rp, region, old);
    }
   }
   IIntuition->ReleaseGIRPort(rp);
@@ -881,6 +999,25 @@ static void LassoSelect(struct FBData *d)
 }
 
 /*
+** Pass GM_GOACTIVE / GM_HANDLEINPUT on to the scroller, with the pointer
+** relative to the scroller's box, and follow its scroll position.
+**
+** Returns the GMR_* result for Intuition: the scroller's own release is not
+** reported as a click in the view (no GMR_VERIFY).
+*/
+static uint32 ScrollerInput(struct FBData *d, Object *o, struct gpInput *gpi)
+{
+ struct gpInput copy = *gpi;
+ uint32 r;
+ copy.gpi_Mouse.X = gpi->gpi_Mouse.X - (d->sb.Left - d->box.Left);
+ copy.gpi_Mouse.Y = gpi->gpi_Mouse.Y - (d->sb.Top - d->box.Top);
+ r = IIntuition->IDoMethodA(d->scroller, (Msg)&copy);
+ if(TopFromScroller(d)) Redraw(d, o, gpi->gpi_GInfo);
+ if((r & (GMR_NOREUSE | GMR_REUSE)) == 0) return GMR_MEACTIVE; /* GMR_MEACTIVE is 0 */
+ return r & ~GMR_VERIFY;
+}
+
+/*
 ** GM_GOACTIVE in icon mode: click on a cell (select, double-click,
 ** Shift toggles), the scroll bar, or empty space (starts a lasso).
 **
@@ -909,6 +1046,19 @@ static uint32 GoActive(Class *cl, Object *o, struct gpInput *gpi)
  /* scroll bar */
  if(x >= d->sb.Left && x < d->sb.Left + d->sb.Width && y >= d->sb.Top && y < d->sb.Top + d->sb.Height)
  {
+  if(d->scroller)
+  {
+   uint32 r;
+   d->sbChild = TRUE;
+   r = ScrollerInput(d, o, gpi);
+   if(r != GMR_MEACTIVE)
+   {
+    struct gpGoInactive gpgi = { GM_GOINACTIVE, gpi->gpi_GInfo, FALSE };
+    IIntuition->IDoMethodA(d->scroller, (Msg)&gpgi);
+    d->sbChild = FALSE;
+   }
+   return r;
+  }
   KnobBox(d, &knob);
   if(y < knob.Top) d->topY -= d->area.Height;
   else if(y >= knob.Top + knob.Height) d->topY += d->area.Height;
@@ -1037,6 +1187,10 @@ static uint32 HandleInput(Class *cl, Object *o, struct gpInput *gpi)
  int32 y = d->box.Top + gpi->gpi_Mouse.Y;
 
  if(ie == NULL) return GMR_MEACTIVE;
+
+ /* the scroller is being used: it gets everything until it is done
+    (GM_GOINACTIVE reaches it from the dispatcher) */
+ if(d->sbChild) return ScrollerInput(d, o, gpi);
 
  /* the wheel while the gadget is active (dragging a lasso): scroll, and
     the lasso's corner stays at the pointer */
@@ -1171,6 +1325,11 @@ static uint32 Dispatch(Class *cl, Object *o, Msg msg)
     d->cellChars = 14;
     d->bgPen = -1;
     d->selIndex = -1;
+    /* the scroll bar of the icon view: the system's, as in the list view */
+    d->scroller = IIntuition->NewObject(NULL, "scroller.gadget",
+     SCROLLER_Orientation, SORIENT_VERT,
+     SCROLLER_Arrows, TRUE,
+     TAG_DONE);
     SetAttrs(d, ((struct opSet *)msg)->ops_AttrList, NULL);
    }
    return result;
@@ -1268,6 +1427,11 @@ static uint32 Dispatch(Class *cl, Object *o, Msg msg)
 
   case OM_DISPOSE:
    d = INST_DATA(cl, o);
+   if(d->scroller)
+   {
+    IIntuition->DisposeObject(d->scroller);
+    d->scroller = NULL;
+   }
    if(d->buf)
    {
     IGraphics->FreeBitMap(d->buf);
@@ -1309,6 +1473,13 @@ static uint32 Dispatch(Class *cl, Object *o, Msg msg)
    d = INST_DATA(cl, o);
    if(d->mode == FBVM_ICONS)
    {
+    if(d->sbChild)
+    {
+     IIntuition->IDoMethodA(d->scroller, msg);
+     d->sbChild = FALSE;
+     TopFromScroller(d);
+     Redraw(d, o, ((struct gpGoInactive *)msg)->gpgi_GInfo); /* the scroller's released look */
+    }
     d->sbDrag = FALSE;
     d->lasso = FALSE;
     ((struct Gadget *)o)->Flags &= ~GFLG_SELECTED;
@@ -1332,7 +1503,10 @@ static uint32 Dispatch(Class *cl, Object *o, Msg msg)
 */
 struct IClass *MakeFileBrowserClass(void)
 {
- struct IClass *cl = IIntuition->MakeClass(NULL, NULL, IListBrowser->LISTBROWSER_GetClass(), sizeof(struct FBData), 0);
+ struct IClass *cl;
+ /* the icon view's scroll bar; without it the class draws its own */
+ if(ScrollerClassBase == NULL) ScrollerClassBase = IExec->OpenLibrary("gadgets/scroller.gadget", 53);
+ cl = IIntuition->MakeClass(NULL, NULL, IListBrowser->LISTBROWSER_GetClass(), sizeof(struct FBData), 0);
  if(cl)
  {
   cl->cl_Dispatcher.h_Entry = (HOOKFUNC)Dispatch;
@@ -1348,5 +1522,10 @@ void FreeFileBrowserClass(struct IClass *cl)
  if(cl)
  {
   IIntuition->FreeClass(cl);
+ }
+ if(ScrollerClassBase)
+ {
+  IExec->CloseLibrary(ScrollerClassBase);
+  ScrollerClassBase = NULL;
  }
 }

@@ -7,7 +7,7 @@ filebrowser/--datasheet--                       filebrowser/--datasheet--
 
     NAME
 	FileBrowser -- listbrowser.gadget subclass with an icon (cell)
-	view mode. (1.1)
+	view mode. (1.2)
 
     SUPERCLASS
 	listbrowser.gadget
@@ -29,8 +29,9 @@ filebrowser/--datasheet--                       filebrowser/--datasheet--
 	size icon from the program, see FILEBROWSER_IconHook) on top, then
 	one line of text per list column. All cells have the same width and
 	flow left to right, top to bottom, using as many cell columns as fit
-	the gadget. The view only scrolls vertically; a scroll bar is shown
-	on the right when the cells don't fit. Texts longer than the cell
+	the gadget. The view only scrolls vertically, with a scroller.gadget
+	on the right, as in details mode (arrows, knob, the user's GUI
+	settings). Texts longer than the cell
 	are cropped as "Long str...".
 
 	Switching the view is one attribute; the list, the column info and
@@ -157,7 +158,8 @@ filebrowser/--datasheet--                       filebrowser/--datasheet--
 
 	The cells are drawn into an offscreen bitmap and blitted in one go,
 	so scrolling doesn't flicker. Without memory for the buffer they are
-	drawn directly, clipped to the gadget.
+	drawn directly. Everything icon mode draws is clipped to the gadget
+	and to the inside of the window's borders.
 
     BUGS
 	Not done yet in icon mode: column titles (for sorting), per column
