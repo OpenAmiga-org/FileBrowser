@@ -93,4 +93,6 @@ echo "FileBrowser/Demo/FileBrowserDemo" > "$L.exe"
 "$ARCEDIT" "$ARC" FROM "$L.files" PROTECT rwd QUIET
 "$ARCEDIT" "$ARC" FROM "$L.exe" PROTECT rwed QUIET
 "$LHA" t "$ARC" > /dev/null
+# the GitHub page's changelog, from the readme
+python3 -I "$ROOT/tools/update_readme.py"
 echo "FileBrowser $ver -> $ARC ($(stat -c %s "$ARC") bytes)"
