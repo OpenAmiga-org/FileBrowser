@@ -2,7 +2,7 @@
 
 A listbrowser.gadget subclass for AmigaOS 4 that can also show its list
 as icons, like a Workbench drawer window. You add it to your program as
-source.
+source. FileBrowser is an [OpenAmiga.org project](http://openamiga.org/?function=gitproject&name=FileBrowser).
 
 In the default details mode the gadget *is* a ListBrowser: every method
 goes to listbrowser.gadget, so you can replace a ListBrowser with a

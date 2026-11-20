@@ -24,6 +24,9 @@ I="$ROOT/package/icons"
 
 ver=$(sed -n 's/^#define FILEBROWSER_VERSION *\([0-9]*\).*/\1/p' "$ROOT/src/FileBrowser.h").$(sed -n 's/^#define FILEBROWSER_REVISION *\([0-9]*\).*/\1/p' "$ROOT/src/FileBrowser.h")
 grep -q "^version: $ver\$" "$ROOT/package/FileBrowser.readme" || { echo "FileBrowser.readme is not version $ver" >&2; exit 1; }
+# OS4Depot shows this as the homepage: the OpenAmiga.org project page
+URL='http://openamiga.org/?function=gitproject&name=FileBrowser'
+grep -qxF "url: $URL" "$ROOT/package/FileBrowser.readme" || { echo "FileBrowser.readme: url must be $URL" >&2; exit 1; }
 
 STAGE="$OUT/stage"
 D="$STAGE/FileBrowser"
