@@ -93,7 +93,7 @@ the changelog here.
 
 <!-- changelog start: made by tools/update_readme.py from package/FileBrowser.readme -->
 - **1.2** (2026-11-16):
-  - Icon view uses a scroller.gadget for its scroll bar, so it looks and works like the one in details mode (arrows, knob, GUI settings). The class opens gadgets/scroller.gadget; without it the old bar is drawn.
+  - Icon view uses a scroller.gadget for its scroll bar, so it looks and works like the one in details mode (arrows, knob, GUI settings). The class opens `gadgets/scroller.gadget`; without it the old bar is drawn.
   - Everything icon view draws is clipped to the gadget and to the inside of the window's borders: a scroll bar piece was once left on a window's status bar and border.
 - **1.1** (2026-11-15):
   - Dragging a selection box past the top or bottom of the view (which scrolls it) no longer draws lines of the box outside the view. The box's corner stays inside the view while it scrolls, so the box is always seen.

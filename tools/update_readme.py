@@ -1,37 +1,59 @@
 #!/usr/bin/env python3
-"""Copy the History of package/FileBrowser.readme into README.md as its
+"""Copy the History of the OS4Depot readme into README.md as its
 "Changelog" section (between the changelog markers). Public domain.
 
-    tools/update_readme.py [--check]
+Reference copy: ~/openamiga-rules/tools/update_readme.py (see
+readme_rules.md). Copy it into a project's tools/ unchanged.
+
+    tools/update_readme.py [--check] [package/<Name>.readme]
+
+Without a readme argument it takes the only package/*.readme. The readme
+may be UTF-8 or ISO-8859-1 (Markdown body). Its History looks like this:
+
+    ## History
+
+    ### 1.2 (16.11.2026)
+
+    - First change, wrapped lines indented
+      by two spaces.
 
 --check only reports (exit 1) when README.md is out of date.
-make_lha.sh runs it, so every release updates the GitHub page.
 """
+import glob
 import os
 import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-START = "<!-- changelog start: made by tools/update_readme.py from package/FileBrowser.readme -->"
 END = "<!-- changelog end -->"
 
 
-def history():
-    # the readme is ISO-8859-1, like every Amiga readme
-    text = open(os.path.join(ROOT, "package", "FileBrowser.readme"), encoding="latin-1").read()
-    m = re.search(r"^History\n-+\n\n(.*)", text, re.S | re.M)
+def read_text(path):
+    raw = open(path, "rb").read()
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return raw.decode("latin-1")
+
+
+def history(path):
+    text = read_text(path)
+    m = re.search(r"^## History\n(.*)", text, re.S | re.M)
     if not m:
-        sys.exit("package/FileBrowser.readme: no History section")
-    # versions: "1.2 (16.11.2026)" followed by " - item" lines (items may wrap)
+        sys.exit(path + ": no \"## History\" section")
     versions = []
     for line in m.group(1).splitlines():
-        v = re.match(r"(\d+\.\d+(?: beta)?) \((\d+)\.(\d+)\.(\d+)\)\s*$", line)
+        v = re.match(r"### (\d+(?:\.\d+)+(?: beta)?) \((\d+)\.(\d+)\.(\d+)\)\s*$", line)
         if v:
-            versions.append(("%s" % v.group(1), "%s-%s-%s" % (v.group(4), v.group(3), v.group(2)), []))
-        elif line.startswith(" - "):
-            versions[-1][2].append(line[3:].strip())
-        elif line.strip() and versions and versions[-1][2]:
+            versions.append((v.group(1), "%s-%s-%s" % (v.group(4), v.group(3), v.group(2)), []))
+        elif line.startswith("- ") and versions:
+            versions[-1][2].append(line[2:].strip())
+        elif line.startswith("  ") and line.strip() and versions and versions[-1][2]:
             versions[-1][2][-1] += " " + line.strip()
+        elif line.startswith("#"):
+            break                     # the next section
+    if not versions:
+        sys.exit(path + ": History has no \"x.y (DD.MM.YYYY)\" entries")
     out = []
     for ver, date, items in versions:
         if len(items) == 1:
@@ -43,14 +65,24 @@ def history():
 
 
 def main():
-    path = os.path.join(ROOT, "README.md")
-    readme = open(path, encoding="utf-8").read()
-    block = START + "\n" + history() + "\n" + END
-    if START in readme:
-        new = re.sub(re.escape(START) + r".*?" + re.escape(END), lambda _: block, readme, flags=re.S)
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    if args:
+        readme = os.path.abspath(args[0])
     else:
-        sys.exit("README.md has no changelog markers")
-    if new == readme:
+        found = glob.glob(os.path.join(ROOT, "package", "*.readme"))
+        if len(found) != 1:
+            sys.exit("give the readme: found %d package/*.readme" % len(found))
+        readme = found[0]
+    rel = os.path.relpath(readme, ROOT)
+    start = "<!-- changelog start: made by tools/update_readme.py from %s -->" % rel
+    path = os.path.join(ROOT, "README.md")
+    text = open(path, encoding="utf-8").read()
+    block = start + "\n" + history(readme) + "\n" + END
+    m = re.search(r"<!-- changelog start:[^>]*-->.*?" + re.escape(END), text, re.S)
+    if not m:
+        sys.exit("README.md has no changelog markers (see readme_rules.md)")
+    new = text[:m.start()] + block + text[m.end():]
+    if new == text:
         return 0
     if "--check" in sys.argv:
         print("README.md changelog is out of date: run tools/update_readme.py", file=sys.stderr)

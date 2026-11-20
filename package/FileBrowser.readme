@@ -11,19 +11,22 @@ replaces:
 requirements: AmigaOS 4.1 SDK
 license: Public domain
 minosversion: 4.1
-texttype: Plain text
+texttype: Markdown
 distribute: yes
 hend:
 
-FileBrowser 1.2 - a ListBrowser with an icon view
-=================================================
+# FileBrowser 1.2 - a ListBrowser with an icon view
 
-FileBrowser is a subclass of listbrowser.gadget that can also show its list
-as icons: each node becomes a cell with its image or icon on top and its
-column texts below, laid out in a grid like a Workbench drawer window.
+FileBrowser is a subclass of listbrowser.gadget that can also show its
+list as icons: each node becomes a cell with its image or icon on top and
+its column texts below, laid out in a grid like a Workbench drawer window.
 
 This is a developer release. FileBrowser is not a library: you add
-FileBrowser.c to your program's build and include FileBrowser.h.
+`FileBrowser.c` to your program's build and include `FileBrowser.h`.
+
+FileBrowser is an [OpenAmiga.org project](http://openamiga.org/?function=gitproject&name=FileBrowser).
+The source code, test versions and bug reports are at
+<https://github.com/OpenAmiga-org/FileBrowser>.
 
 In the default details mode the gadget *is* a ListBrowser: every method
 goes to listbrowser.gadget, so you can replace a ListBrowser with a
@@ -32,53 +35,48 @@ FileBrowser and nothing changes. One attribute switches to the icon view:
     SetGadgetAttrs(gad, win, NULL, FILEBROWSER_ViewMode, FBVM_ICONS, TAG_DONE);
 
 The list, the column info and your event handling stay as they are:
-selection, double-clicks (LBRE_DOUBLECLICK), LISTBROWSER_Selected and the
-other selection attributes keep working in both views.
+selection, double-clicks (`LBRE_DOUBLECLICK`), `LISTBROWSER_Selected` and
+the other selection attributes keep working in both views.
 
+## Icon view
 
-Icon view
----------
+- Cells flow left to right, top to bottom; the view scrolls vertically.
+- The node's `LBNCA_Image`, or a full size icon (struct DiskObject) that
+  your program returns from `FILEBROWSER_IconHook`.
+- `FILEBROWSER_IconSize` gives every cell the same image box, like an
+  icon grid: larger icons are scaled down, keeping their aspect ratio.
+- One text line per list column; `FILEBROWSER_HiddenColumns` hides some.
+- Click, Shift-click, double-click, a selection box (lasso) dragged from
+  empty space, the mouse wheel, and dragging selected cells for your own
+  drag & drop.
+- Drawn through an offscreen bitmap, so scrolling doesn't flicker.
 
- - Cells flow left to right, top to bottom; the view scrolls vertically.
- - The node's LBNCA_Image, or a full size icon (struct DiskObject) that
-   your program returns from FILEBROWSER_IconHook.
- - FILEBROWSER_IconSize gives every cell the same image box, like an icon
-   grid: larger icons are scaled down, keeping their aspect ratio.
- - One text line per list column; FILEBROWSER_HiddenColumns hides some.
- - Click, Shift-click, double-click, a selection box (lasso) dragged from
-   empty space, the mouse wheel, and dragging selected cells for your own
-   drag & drop.
- - Drawn through an offscreen bitmap, so scrolling doesn't flicker.
+## Contents
 
+- `FileBrowser/FileBrowser.readme`: this file
+- `FileBrowser/LICENSE`: public domain (The Unlicense)
+- `FileBrowser/Autodocs/FileBrowser.doc`: the class: attributes, methods,
+  functions
+- `FileBrowser/Include/FileBrowser.h`: the attributes and
+  `MakeFileBrowserClass()`
+- `FileBrowser/Source/FileBrowser.c`: the class
+- `FileBrowser/Demo/FileBrowserDemo`: a ready-built example: lists a
+  drawer (`SYS:` by default, or `FileBrowserDemo <drawer>`) and a button
+  switches between the two views
+- `FileBrowser/Demo/FileBrowserDemo.c`, `Demo/makefile`: its source;
+  `make` in `Demo/` builds it
 
-Contents
---------
+## Using it
 
- FileBrowser/
-   FileBrowser.readme    this file
-   LICENSE               public domain (The Unlicense)
-   Autodocs/FileBrowser.doc
-                         the class: attributes, methods, functions
-   Include/FileBrowser.h the attributes and MakeFileBrowserClass()
-   Source/FileBrowser.c  the class
-   Demo/FileBrowserDemo  a ready-built example: lists a drawer (SYS: by
-                         default, or "FileBrowserDemo <drawer>") and a
-                         button switches between the two views
-   Demo/FileBrowserDemo.c, Demo/makefile
-                         its source; "make" in Demo/ builds it
-
-
-Using it
---------
-
-1. Copy Include/FileBrowser.h and Source/FileBrowser.c into your project
-   and compile FileBrowser.c with the rest of your program.
-
+1. Copy `Include/FileBrowser.h` and `Source/FileBrowser.c` into your
+   project and compile `FileBrowser.c` with the rest of your program.
 2. Open the interfaces the class uses (it uses your program's global
-   interface pointers): IExec, IIntuition, IGraphics, ILayers, IUtility,
-   IIcon and IListBrowser.
+   interface pointers): `IExec`, `IIntuition`, `IGraphics`, `ILayers`,
+   `IUtility`, `IIcon` and `IListBrowser`.
+3. Make the class, then gadgets from it (example below).
+4. When the windows are gone: `FreeFileBrowserClass(cl)`.
 
-3. Make the class, then gadgets from it:
+Example for step 3:
 
     #include "FileBrowser.h"
 
@@ -93,49 +91,46 @@ Using it
         LISTBROWSER_MultiSelect,  TRUE,
         TAG_DONE);
 
-4. When the windows are gone: FreeFileBrowserClass(cl).
-
 The class is private: objects are made with the class pointer, not by
-name. Autodocs/FileBrowser.doc describes every attribute; Demo/ shows a
-complete program.
+name. `Autodocs/FileBrowser.doc` describes every attribute; `Demo/` shows
+a complete program.
 
-Building the demo: the makefile uses ppc-amigaos-gcc, as in the AmigaOS 4
-SDK and in cross compilers. If your SDK only has "gcc", run
-"make CC=gcc". FileBrowser.c doesn't depend on a C library: it only uses
-AmigaOS interfaces, so it builds with newlib (the default) as well as
-clib4. The demo is written for newlib: it defines IUtility itself, which
-clib4's startup code also does.
+Building the demo: the makefile uses `ppc-amigaos-gcc`, as in the
+AmigaOS 4 SDK and in cross compilers. If your SDK only has `gcc`, run
+`make CC=gcc`. `FileBrowser.c` doesn't depend on a C library: it only
+uses AmigaOS interfaces, so it builds with newlib (the default) as well
+as clib4. The demo is written for newlib: it defines `IUtility` itself,
+which clib4's startup code also does.
 
-FILEBROWSER_VERSION and FILEBROWSER_REVISION in FileBrowser.h tell which
-release a copy of the header belongs to.
+`FILEBROWSER_VERSION` and `FILEBROWSER_REVISION` in `FileBrowser.h` tell
+which release a copy of the header belongs to.
 
-
-License
--------
+## License
 
 Public domain. Use it in any program, free or commercial, change it, and
-leave out credits if you like. See LICENSE.
+leave out credits if you like. See `LICENSE`.
 
+## History
 
-History
--------
+### 1.2 (16.11.2026)
 
-1.2 (16.11.2026)
- - Icon view uses a scroller.gadget for its scroll bar, so it looks and
-   works like the one in details mode (arrows, knob, GUI settings). The
-   class opens gadgets/scroller.gadget; without it the old bar is drawn.
- - Everything icon view draws is clipped to the gadget and to the inside
-   of the window's borders: a scroll bar piece was once left on a
-   window's status bar and border.
+- Icon view uses a scroller.gadget for its scroll bar, so it looks and
+  works like the one in details mode (arrows, knob, GUI settings). The
+  class opens `gadgets/scroller.gadget`; without it the old bar is drawn.
+- Everything icon view draws is clipped to the gadget and to the inside
+  of the window's borders: a scroll bar piece was once left on a
+  window's status bar and border.
 
-1.1 (15.11.2026)
- - Dragging a selection box past the top or bottom of the view (which
-   scrolls it) no longer draws lines of the box outside the view. The
-   box's corner stays inside the view while it scrolls, so the box is
-   always seen.
- - The mouse wheel also scrolls while a selection box is dragged.
- - Icon view paints the thin gaps around the cells and the scroll bar;
-   bits of the list view showed through there after switching views.
+### 1.1 (15.11.2026)
 
-1.0 (15.11.2026)
- - First release.
+- Dragging a selection box past the top or bottom of the view (which
+  scrolls it) no longer draws lines of the box outside the view. The
+  box's corner stays inside the view while it scrolls, so the box is
+  always seen.
+- The mouse wheel also scrolls while a selection box is dragged.
+- Icon view paints the thin gaps around the cells and the scroll bar;
+  bits of the list view showed through there after switching views.
+
+### 1.0 (15.11.2026)
+
+- First release.
