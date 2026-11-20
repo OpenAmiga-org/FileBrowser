@@ -42,7 +42,7 @@ cp "$ROOT/src/FileBrowserDemo.c" "$D/Demo/"
 cat > "$D/Demo/makefile" <<'MK'
 #
 # FileBrowserDemo - example for the FileBrowser gadget class
-# http://openamiga.org/?function=viewproject&projectid=52
+# http://openamiga.org/?function=gitproject&name=FileBrowser
 #
 # "make" builds FileBrowserDemo from this drawer, ../Source/FileBrowser.c
 # and ../Include/FileBrowser.h. With an SDK that has only "gcc":

@@ -4,11 +4,10 @@
 **              with an icon (cell) view mode.
 **
 ** OpenAmiga.org
-** This file is part of the OpenAmiga "Listbrowser gadget with cell mode"
-** project.
+** This file is part of the OpenAmiga "FileBrowser" project.
 **
 ** For more information look at:
-** http://openamiga.org/?function=viewproject&projectid=52
+** http://openamiga.org/?function=gitproject&name=FileBrowser
 **
 ** Public domain: see LICENSE in the release archive.
 **

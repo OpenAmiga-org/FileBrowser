@@ -1,6 +1,6 @@
 #
-# FileBrowser gadget class - OpenAmiga project 52
-# http://openamiga.org/?function=viewproject&projectid=52
+# FileBrowser gadget class - OpenAmiga project FileBrowser
+# http://openamiga.org/?function=gitproject&name=FileBrowser
 #
 # Builds FileBrowserDemo, which links FileBrowser.o. Applications add
 # FileBrowser.c and FileBrowser.h to their own build.
